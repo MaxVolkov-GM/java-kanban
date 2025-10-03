@@ -17,22 +17,22 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         try (PrintWriter writer = new PrintWriter(file)) {
             // Записываем заголовок CSV
             writer.println("id,type,name,status,description,epic");
-            
+
             // Сохраняем задачи
             for (Task task : getAllTasks()) {
                 writer.println(toString(task));
             }
-            
+
             // Сохраняем эпики
             for (Epic epic : getAllEpics()) {
                 writer.println(toString(epic));
             }
-            
+
             // Сохраняем подзадачи
             for (Subtask subtask : getAllSubtasks()) {
                 writer.println(toString(subtask));
             }
-            
+
         } catch (IOException e) {
             throw new ManagerSaveException("Ошибка сохранения в файл", e);
         }
@@ -46,7 +46,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         } else if (task instanceof Subtask) {
             Subtask subtask = (Subtask) task;
             return String.format("%d,SUBTASK,%s,%s,%s,%d",
-                    subtask.getId(), subtask.getName(), subtask.getStatus(), 
+                    subtask.getId(), subtask.getName(), subtask.getStatus(),
                     subtask.getDescription(), subtask.getEpicId());
         } else {
             return String.format("%d,TASK,%s,%s,%s,",
@@ -144,16 +144,16 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     // Статический метод загрузки из файла
     public static FileBackedTaskManager loadFromFile(File file) {
         FileBackedTaskManager manager = new FileBackedTaskManager(file);
-        
+
         try {
             String content = Files.readString(file.toPath());
             String[] lines = content.split("\n");
-            
+
             // Пропускаем заголовок и пустые строки
             for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
                 if (line.isEmpty()) continue;
-                
+
                 Task task = manager.fromString(line);
                 if (task instanceof Epic) {
                     manager.epics.put(task.getId(), (Epic) task);
@@ -162,13 +162,13 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 } else {
                     manager.tasks.put(task.getId(), task);
                 }
-                
+
                 // Обновляем nextId
                 if (task.getId() >= manager.nextId) {
                     manager.nextId = task.getId() + 1;
                 }
             }
-            
+
             // Восстанавливаем связи эпиков и подзадач
             for (Subtask subtask : manager.subtasks.values()) {
                 Epic epic = manager.epics.get(subtask.getEpicId());
@@ -176,11 +176,11 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                     epic.addSubtaskId(subtask.getId());
                 }
             }
-            
+
         } catch (IOException e) {
             throw new ManagerSaveException("Ошибка загрузки из файла", e);
         }
-        
+
         return manager;
     }
 }
