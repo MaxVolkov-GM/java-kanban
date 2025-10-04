@@ -4,8 +4,6 @@ import ru.practikum.model.*;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 
 public class FileBackedTaskManager extends InMemoryTaskManager {
     private final File file;
@@ -184,19 +182,5 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         }
 
         return manager;
-    }
-}
-
-// Enum для типов задач
-enum TaskType {
-    TASK,
-    EPIC,
-    SUBTASK
-}
-
-// Класс исключения для ошибок сохранения/загрузки
-class ManagerSaveException extends RuntimeException {
-    public ManagerSaveException(String message, Throwable cause) {
-        super(message, cause);
     }
 }
