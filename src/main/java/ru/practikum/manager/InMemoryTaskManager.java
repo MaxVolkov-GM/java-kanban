@@ -8,11 +8,11 @@ import ru.practikum.model.Task;
 import java.util.*;
 
 public class InMemoryTaskManager implements TaskManager {
-    private int nextId = 1;
-    private final Map<Integer, Task> tasks = new HashMap<>();
-    private final Map<Integer, Epic> epics = new HashMap<>();
-    private final Map<Integer, Subtask> subtasks = new HashMap<>();
-    private final HistoryManager historyManager;
+    protected int nextId = 1;
+    protected final Map<Integer, Task> tasks = new HashMap<>();
+    protected final Map<Integer, Epic> epics = new HashMap<>();
+    protected final Map<Integer, Subtask> subtasks = new HashMap<>();
+    protected final HistoryManager historyManager;
 
     public InMemoryTaskManager() {
         this.historyManager = Managers.getDefaultHistory();
@@ -182,45 +182,6 @@ public class InMemoryTaskManager implements TaskManager {
     @Override
     public List<Task> getHistory() {
         return historyManager.getHistory();
-    }
-
-    @Override
-    public void deleteTasks() {
-        // Удаляем все задачи из истории
-        for (Integer taskId : tasks.keySet()) {
-            historyManager.remove(taskId);
-        }
-        tasks.clear();
-    }
-
-    @Override
-    public void deleteSubtasks() {
-        // Удаляем все подзадачи из истории
-        for (Integer subtaskId : subtasks.keySet()) {
-            historyManager.remove(subtaskId);
-        }
-        subtasks.clear();
-
-        // Обновляем эпики - очищаем списки подзадач и статусы
-        for (Epic epic : epics.values()) {
-            epic.getSubtaskIds().clear();
-            updateEpicStatus(epic);
-        }
-    }
-
-    @Override
-    public void deleteEpics() {
-        // Удаляем все подзадачи из истории и хранилища
-        for (Integer subtaskId : subtasks.keySet()) {
-            historyManager.remove(subtaskId);
-        }
-        subtasks.clear();
-
-        // Удаляем все эпики из истории и хранилища
-        for (Integer epicId : epics.keySet()) {
-            historyManager.remove(epicId);
-        }
-        epics.clear();
     }
 
     private void updateEpicStatus(Epic epic) {
