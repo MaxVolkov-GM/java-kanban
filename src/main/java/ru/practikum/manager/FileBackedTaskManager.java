@@ -1,11 +1,14 @@
 package ru.practikum.manager;
 
 import ru.practikum.model.*;
+import ru.practikum.model.TaskType;
+import ru.practikum.exception.*;
 
 import java.io.*;
 import java.nio.file.Files;
 
 public class FileBackedTaskManager extends InMemoryTaskManager {
+    private static final String CSV_HEADER = "id,type,name,status,description,epic";
     private final File file;
 
     public FileBackedTaskManager(File file) {
@@ -16,7 +19,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     protected void save() {
         try (PrintWriter writer = new PrintWriter(file)) {
             // Записываем заголовок CSV
-            writer.println("id,type,name,status,description,epic");
+            writer.println(CSV_HEADER);
 
             // Сохраняем задачи
             for (Task task : getAllTasks()) {
@@ -40,17 +43,20 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     // Преобразование задачи в строку CSV
     private String toString(Task task) {
-        if (task instanceof Epic) {
-            return String.format("%d,EPIC,%s,%s,%s,",
-                    task.getId(), task.getName(), task.getStatus(), task.getDescription());
-        } else if (task instanceof Subtask) {
-            Subtask subtask = (Subtask) task;
-            return String.format("%d,SUBTASK,%s,%s,%s,%d",
-                    subtask.getId(), subtask.getName(), subtask.getStatus(),
-                    subtask.getDescription(), subtask.getEpicId());
-        } else {
-            return String.format("%d,TASK,%s,%s,%s,",
-                    task.getId(), task.getName(), task.getStatus(), task.getDescription());
+        TaskType type = task.getType();
+        switch (type) {
+            case EPIC:
+                return String.format("%d,EPIC,%s,%s,%s,",
+                        task.getId(), task.getName(), task.getStatus(), task.getDescription());
+            case SUBTASK:
+                Subtask subtask = (Subtask) task;
+                return String.format("%d,SUBTASK,%s,%s,%s,%d",
+                        subtask.getId(), subtask.getName(), subtask.getStatus(),
+                        subtask.getDescription(), subtask.getEpicId());
+            case TASK:
+            default:
+                return String.format("%d,TASK,%s,%s,%s,",
+                        task.getId(), task.getName(), task.getStatus(), task.getDescription());
         }
     }
 
@@ -178,7 +184,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             }
 
         } catch (IOException e) {
-            throw new ManagerSaveException("Ошибка загрузки из файла", e);
+            throw new ManagerLoadException("Ошибка загрузки из файла", e);
         }
 
         return manager;

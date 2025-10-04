@@ -10,8 +10,13 @@ public class Subtask extends Task {
 
     // ИСПРАВЛЕННЫЙ конструктор копирования
     public Subtask(Subtask original) {
-        super(original); // ← Вызываем родительский конструктор копирования
+        super(original);
         this.epicId = original.epicId;
+    }
+
+    @Override
+    public TaskType getType() {
+        return TaskType.SUBTASK;
     }
 
     public int getEpicId() {

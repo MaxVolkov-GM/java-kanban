@@ -12,9 +12,13 @@ public class Epic extends Task {
 
     // ИСПРАВЛЕННЫЙ конструктор копирования
     public Epic(Epic original) {
-        super(original); // ← Вызываем родительский конструктор копирования
-        // subtaskIds уже инициализирован пустым списком
-        this.subtaskIds.addAll(original.subtaskIds); // ← Копируем список подзадач
+        super(original);
+        this.subtaskIds.addAll(original.subtaskIds);
+    }
+
+    @Override
+    public TaskType getType() {
+        return TaskType.EPIC;
     }
 
     public List<Integer> getSubtaskIds() {

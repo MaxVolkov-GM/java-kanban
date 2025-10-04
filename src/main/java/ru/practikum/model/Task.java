@@ -16,13 +16,17 @@ public class Task {
 
     // ИСПРАВЛЕННЫЙ конструктор копирования
     public Task(Task original) {
-        this.id = original.id; // ← ДОБАВИТЬ копирование ID!
+        this.id = original.id;
         this.name = original.name;
         this.description = original.description;
         this.status = original.status;
     }
 
-    // Геттеры и сеттеры остаются без изменений
+    public TaskType getType() {
+        return TaskType.TASK;
+    }
+
+    // Геттеры и сеттеры с правильным форматированием
     public int getId() {
         return id;
     }
