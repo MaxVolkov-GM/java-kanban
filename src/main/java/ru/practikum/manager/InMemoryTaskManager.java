@@ -7,6 +7,7 @@ import ru.practikum.model.Status;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class InMemoryTaskManager implements TaskManager {
@@ -20,18 +21,97 @@ public class InMemoryTaskManager implements TaskManager {
                     .thenComparing(Task::getId)
     );
 
-    // Простая и надежная проверка пересечений
+    // --- 15-МИНУТНАЯ СЕТКА ДЛЯ O(1) ПРОВЕРКИ ПЕРЕСЕЧЕНИЙ ---
+    private static final int INTERVAL_MINUTES = 15;
+    private static final int MINUTES_PER_YEAR = 365 * 24 * 60;
+    private static final int INTERVALS_PER_YEAR = MINUTES_PER_YEAR / INTERVAL_MINUTES;
+    private final boolean[] scheduleGrid = new boolean[INTERVALS_PER_YEAR];
+    private static final LocalDateTime BASE_DATE = LocalDateTime.now()
+            .withDayOfYear(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+
+    // Перевод времени в индекс массива
+    private Integer timeToGridIndex(LocalDateTime time) {
+        if (time == null) return null;
+        long minutesFromBase = ChronoUnit.MINUTES.between(BASE_DATE, time);
+        if (minutesFromBase < 0 || minutesFromBase >= MINUTES_PER_YEAR) return null;
+        return (int) (minutesFromBase / INTERVAL_MINUTES);
+    }
+
+    // Проверка свободны ли интервалы в сетке
+    private boolean areGridIntervalsFree(Task task) {
+        if (task.getStartTime() == null || task.getDuration() == null) {
+            return true;
+        }
+        
+        Integer startIndex = timeToGridIndex(task.getStartTime());
+        Integer endIndex = timeToGridIndex(task.getEndTime());
+        
+        if (startIndex == null || endIndex == null) {
+            return true; // Задача вне сетки - пропускаем проверку
+        }
+        
+        for (int i = startIndex; i < endIndex; i++) {
+            if (scheduleGrid[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Занять интервалы в сетке
+    private void occupyGridIntervals(Task task) {
+        if (task.getStartTime() == null || task.getDuration() == null) {
+            return;
+        }
+        
+        Integer startIndex = timeToGridIndex(task.getStartTime());
+        Integer endIndex = timeToGridIndex(task.getEndTime());
+        
+        if (startIndex != null && endIndex != null) {
+            for (int i = startIndex; i < endIndex; i++) {
+                scheduleGrid[i] = true;
+            }
+        }
+    }
+
+    // Освободить интервалы в сетке
+    private void freeGridIntervals(Task task) {
+        if (task.getStartTime() == null || task.getDuration() == null) {
+            return;
+        }
+        
+        Integer startIndex = timeToGridIndex(task.getStartTime());
+        Integer endIndex = timeToGridIndex(task.getEndTime());
+        
+        if (startIndex != null && endIndex != null) {
+            for (int i = startIndex; i < endIndex; i++) {
+                scheduleGrid[i] = false;
+            }
+        }
+    }
+
+    // ГИБРИДНАЯ ПРОВЕРКА: СЕТКА + STREAM API
     protected boolean hasTimeOverlapWithExisting(Task newTask) {
         if (newTask.getStartTime() == null || newTask.getEndTime() == null) {
             return false;
         }
-
-        for (Task existingTask : prioritizedTasks) {
-            if (existingTask.getId() != newTask.getId() && isOverlapping(newTask, existingTask)) {
-                return true;
-            }
+        
+        // 1. Быстрая проверка через сетку O(1)
+        if (!areGridIntervalsFree(newTask)) {
+            return true;
         }
-        return false;
+        
+        // 2. Проверка через Stream API для задач вне сетки
+        return prioritizedTasks.stream()
+                .filter(existingTask -> existingTask.getId() != newTask.getId())
+                .filter(existingTask -> existingTask.getStartTime() != null)
+                .filter(existingTask -> existingTask.getEndTime() != null)
+                .filter(existingTask -> {
+                    // Проверяем только задачи вне сетки или те, что не попали в сетку
+                    Integer startIndex = timeToGridIndex(existingTask.getStartTime());
+                    return startIndex == null; // Если null - задача вне сетки
+                })
+                .anyMatch(existingTask -> isOverlapping(newTask, existingTask));
     }
 
     // Проверка пересечения двух задач по времени
@@ -59,6 +139,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (task.getStartTime() != null) {
             prioritizedTasks.add(task);
+            occupyGridIntervals(task); // ЗАНИМАЕМ ИНТЕРВАЛЫ В СЕТКЕ
         }
 
         return task.getId();
@@ -71,12 +152,14 @@ public class InMemoryTaskManager implements TaskManager {
         Task oldTask = tasks.get(task.getId());
         if (oldTask.getStartTime() != null) {
             prioritizedTasks.remove(oldTask);
+            freeGridIntervals(oldTask); // ОСВОБОЖДАЕМ СТАРЫЕ ИНТЕРВАЛЫ
         }
 
         if (hasTimeOverlapWithExisting(task)) {
             // возвращаем старую задачу
             if (oldTask.getStartTime() != null) {
                 prioritizedTasks.add(oldTask);
+                occupyGridIntervals(oldTask);
             }
             throw new IllegalArgumentException("Задача пересекается по времени с существующей задачей");
         }
@@ -85,6 +168,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (task.getStartTime() != null) {
             prioritizedTasks.add(task);
+            occupyGridIntervals(task); // ЗАНИМАЕМ НОВЫЕ ИНТЕРВАЛЫ
         }
     }
 
@@ -95,6 +179,7 @@ public class InMemoryTaskManager implements TaskManager {
             historyManager.remove(id);
             if (task.getStartTime() != null) {
                 prioritizedTasks.remove(task);
+                freeGridIntervals(task); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ
             }
         }
     }
@@ -141,6 +226,7 @@ public class InMemoryTaskManager implements TaskManager {
                 Subtask subtask = subtasks.remove(subtaskId);
                 if (subtask != null && subtask.getStartTime() != null) {
                     prioritizedTasks.remove(subtask);
+                    freeGridIntervals(subtask); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ ПОДЗАДАЧ
                 }
                 historyManager.remove(subtaskId);
             }
@@ -179,6 +265,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
+            occupyGridIntervals(subtask); // ЗАНИМАЕМ ИНТЕРВАЛЫ
         }
 
         return subtask.getId();
@@ -194,11 +281,13 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (oldSubtask.getStartTime() != null) {
             prioritizedTasks.remove(oldSubtask);
+            freeGridIntervals(oldSubtask); // ОСВОБОЖДАЕМ СТАРЫЕ ИНТЕРВАЛЫ
         }
 
         if (hasTimeOverlapWithExisting(subtask)) {
             if (oldSubtask.getStartTime() != null) {
                 prioritizedTasks.add(oldSubtask);
+                occupyGridIntervals(oldSubtask);
             }
             throw new IllegalArgumentException("Подзадача пересекается по времени с существующей задачей");
         }
@@ -209,6 +298,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
+            occupyGridIntervals(subtask); // ЗАНИМАЕМ НОВЫЕ ИНТЕРВАЛЫ
         }
     }
 
@@ -225,6 +315,7 @@ public class InMemoryTaskManager implements TaskManager {
             historyManager.remove(id);
             if (subtask.getStartTime() != null) {
                 prioritizedTasks.remove(subtask);
+                freeGridIntervals(subtask); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ
             }
         }
     }
@@ -263,7 +354,10 @@ public class InMemoryTaskManager implements TaskManager {
     @Override
     public void deleteTasks() {
         for (Task t : tasks.values()) {
-            if (t.getStartTime() != null) prioritizedTasks.remove(t);
+            if (t.getStartTime() != null) {
+                prioritizedTasks.remove(t);
+                freeGridIntervals(t); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ
+            }
             historyManager.remove(t.getId());
         }
         tasks.clear();
@@ -278,7 +372,10 @@ public class InMemoryTaskManager implements TaskManager {
                 updateEpicStatus(epic);
                 updateEpicTime(epic);
             }
-            if (s.getStartTime() != null) prioritizedTasks.remove(s);
+            if (s.getStartTime() != null) {
+                prioritizedTasks.remove(s);
+                freeGridIntervals(s); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ
+            }
             historyManager.remove(s.getId());
         }
         subtasks.clear();
@@ -290,7 +387,10 @@ public class InMemoryTaskManager implements TaskManager {
             for (Integer subId : e.getSubtaskIds()) {
                 Subtask s = subtasks.remove(subId);
                 if (s != null) {
-                    if (s.getStartTime() != null) prioritizedTasks.remove(s);
+                    if (s.getStartTime() != null) {
+                        prioritizedTasks.remove(s);
+                        freeGridIntervals(s); // ОСВОБОЖДАЕМ ИНТЕРВАЛЫ
+                    }
                     historyManager.remove(subId);
                 }
             }
