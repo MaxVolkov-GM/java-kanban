@@ -7,7 +7,6 @@ import ru.practikum.model.Status;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class InMemoryTaskManager implements TaskManager {
@@ -21,67 +20,29 @@ public class InMemoryTaskManager implements TaskManager {
                     .thenComparing(Task::getId)
     );
 
-    // --- Оптимизированная проверка пересечений за O(1) ---
-    private static final int INTERVAL_MINUTES = 15;
-    private static final int MINUTES_PER_YEAR = 365 * 24 * 60;
-    private static final int INTERVALS_PER_YEAR = MINUTES_PER_YEAR / INTERVAL_MINUTES;
-    private final boolean[] schedule = new boolean[INTERVALS_PER_YEAR];
-
-    // Базовая дата для расчета индексов (можно использовать любую фиксированную дату)
-    private static final LocalDateTime BASE_DATE = LocalDateTime.of(2024, 1, 1, 0, 0);
-
-    // Перевод времени в индекс массива
-    private int timeToIndex(LocalDateTime time) {
-        long minutesFromBase = ChronoUnit.MINUTES.between(BASE_DATE, time);
-        return (int) (minutesFromBase / INTERVAL_MINUTES);
-    }
-
-    // Проверка, что интервалы свободны
-    private boolean areIntervalsFree(int startIndex, int endIndex) {
-        if (startIndex < 0 || endIndex >= INTERVALS_PER_YEAR) {
-            return false; // Выход за границы планирования
-        }
-        
-        for (int i = startIndex; i < endIndex; i++) {
-            if (schedule[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Занять интервалы
-    private void occupyIntervals(int startIndex, int endIndex) {
-        for (int i = startIndex; i < endIndex; i++) {
-            schedule[i] = true;
-        }
-    }
-
-    // Освободить интервалы
-    private void freeIntervals(int startIndex, int endIndex) {
-        for (int i = startIndex; i < endIndex; i++) {
-            schedule[i] = false;
-        }
-    }
-
-    // Проверка пересечения с существующими задачами
-    protected boolean hasTimeOverlapWithExisting(Task task) {
-        if (task.getStartTime() == null || task.getDuration() == null) {
+    // Простая и надежная проверка пересечений
+    protected boolean hasTimeOverlapWithExisting(Task newTask) {
+        if (newTask.getStartTime() == null || newTask.getEndTime() == null) {
             return false;
         }
 
-        LocalDateTime startTime = task.getStartTime();
-        LocalDateTime endTime = task.getEndTime();
-        
-        int startIndex = timeToIndex(startTime);
-        int endIndex = timeToIndex(endTime);
-        
-        // Проверяем границы
-        if (startIndex < 0 || endIndex >= INTERVALS_PER_YEAR) {
-            return true; // Выход за границы планирования = пересечение
+        for (Task existingTask : prioritizedTasks) {
+            if (existingTask.getId() != newTask.getId() && isOverlapping(newTask, existingTask)) {
+                return true;
+            }
         }
-        
-        return !areIntervalsFree(startIndex, endIndex);
+        return false;
+    }
+
+    // Проверка пересечения двух задач по времени
+    protected boolean isOverlapping(Task task1, Task task2) {
+        if (task1.getStartTime() == null || task1.getEndTime() == null ||
+            task2.getStartTime() == null || task2.getEndTime() == null) {
+            return false;
+        }
+
+        return task1.getStartTime().isBefore(task2.getEndTime()) &&
+               task1.getEndTime().isAfter(task2.getStartTime());
     }
 
     // --- CRUD для задач ---
@@ -98,12 +59,6 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (task.getStartTime() != null) {
             prioritizedTasks.add(task);
-            // Занимаем интервалы
-            LocalDateTime startTime = task.getStartTime();
-            LocalDateTime endTime = task.getEndTime();
-            int startIndex = timeToIndex(startTime);
-            int endIndex = timeToIndex(endTime);
-            occupyIntervals(startIndex, endIndex);
         }
 
         return task.getId();
@@ -116,23 +71,12 @@ public class InMemoryTaskManager implements TaskManager {
         Task oldTask = tasks.get(task.getId());
         if (oldTask.getStartTime() != null) {
             prioritizedTasks.remove(oldTask);
-            // Освобождаем старые интервалы
-            LocalDateTime oldStartTime = oldTask.getStartTime();
-            LocalDateTime oldEndTime = oldTask.getEndTime();
-            int oldStartIndex = timeToIndex(oldStartTime);
-            int oldEndIndex = timeToIndex(oldEndTime);
-            freeIntervals(oldStartIndex, oldEndIndex);
         }
 
         if (hasTimeOverlapWithExisting(task)) {
-            // Возвращаем старую задачу
+            // возвращаем старую задачу
             if (oldTask.getStartTime() != null) {
                 prioritizedTasks.add(oldTask);
-                LocalDateTime oldStartTime = oldTask.getStartTime();
-                LocalDateTime oldEndTime = oldTask.getEndTime();
-                int oldStartIndex = timeToIndex(oldStartTime);
-                int oldEndIndex = timeToIndex(oldEndTime);
-                occupyIntervals(oldStartIndex, oldEndIndex);
             }
             throw new IllegalArgumentException("Задача пересекается по времени с существующей задачей");
         }
@@ -141,12 +85,6 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (task.getStartTime() != null) {
             prioritizedTasks.add(task);
-            // Занимаем новые интервалы
-            LocalDateTime startTime = task.getStartTime();
-            LocalDateTime endTime = task.getEndTime();
-            int startIndex = timeToIndex(startTime);
-            int endIndex = timeToIndex(endTime);
-            occupyIntervals(startIndex, endIndex);
         }
     }
 
@@ -157,12 +95,6 @@ public class InMemoryTaskManager implements TaskManager {
             historyManager.remove(id);
             if (task.getStartTime() != null) {
                 prioritizedTasks.remove(task);
-                // Освобождаем интервалы
-                LocalDateTime startTime = task.getStartTime();
-                LocalDateTime endTime = task.getEndTime();
-                int startIndex = timeToIndex(startTime);
-                int endIndex = timeToIndex(endTime);
-                freeIntervals(startIndex, endIndex);
             }
         }
     }
@@ -209,12 +141,6 @@ public class InMemoryTaskManager implements TaskManager {
                 Subtask subtask = subtasks.remove(subtaskId);
                 if (subtask != null && subtask.getStartTime() != null) {
                     prioritizedTasks.remove(subtask);
-                    // Освобождаем интервалы подзадачи
-                    LocalDateTime startTime = subtask.getStartTime();
-                    LocalDateTime endTime = subtask.getEndTime();
-                    int startIndex = timeToIndex(startTime);
-                    int endIndex = timeToIndex(endTime);
-                    freeIntervals(startIndex, endIndex);
                 }
                 historyManager.remove(subtaskId);
             }
@@ -253,12 +179,6 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
-            // Занимаем интервалы
-            LocalDateTime startTime = subtask.getStartTime();
-            LocalDateTime endTime = subtask.getEndTime();
-            int startIndex = timeToIndex(startTime);
-            int endIndex = timeToIndex(endTime);
-            occupyIntervals(startIndex, endIndex);
         }
 
         return subtask.getId();
@@ -274,23 +194,11 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (oldSubtask.getStartTime() != null) {
             prioritizedTasks.remove(oldSubtask);
-            // Освобождаем старые интервалы
-            LocalDateTime oldStartTime = oldSubtask.getStartTime();
-            LocalDateTime oldEndTime = oldSubtask.getEndTime();
-            int oldStartIndex = timeToIndex(oldStartTime);
-            int oldEndIndex = timeToIndex(oldEndTime);
-            freeIntervals(oldStartIndex, oldEndIndex);
         }
 
         if (hasTimeOverlapWithExisting(subtask)) {
-            // Возвращаем старую подзадачу
             if (oldSubtask.getStartTime() != null) {
                 prioritizedTasks.add(oldSubtask);
-                LocalDateTime oldStartTime = oldSubtask.getStartTime();
-                LocalDateTime oldEndTime = oldSubtask.getEndTime();
-                int oldStartIndex = timeToIndex(oldStartTime);
-                int oldEndIndex = timeToIndex(oldEndTime);
-                occupyIntervals(oldStartIndex, oldEndIndex);
             }
             throw new IllegalArgumentException("Подзадача пересекается по времени с существующей задачей");
         }
@@ -301,12 +209,6 @@ public class InMemoryTaskManager implements TaskManager {
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
-            // Занимаем новые интервалы
-            LocalDateTime startTime = subtask.getStartTime();
-            LocalDateTime endTime = subtask.getEndTime();
-            int startIndex = timeToIndex(startTime);
-            int endIndex = timeToIndex(endTime);
-            occupyIntervals(startIndex, endIndex);
         }
     }
 
@@ -323,12 +225,6 @@ public class InMemoryTaskManager implements TaskManager {
             historyManager.remove(id);
             if (subtask.getStartTime() != null) {
                 prioritizedTasks.remove(subtask);
-                // Освобождаем интервалы
-                LocalDateTime startTime = subtask.getStartTime();
-                LocalDateTime endTime = subtask.getEndTime();
-                int startIndex = timeToIndex(startTime);
-                int endIndex = timeToIndex(endTime);
-                freeIntervals(startIndex, endIndex);
             }
         }
     }
@@ -367,14 +263,7 @@ public class InMemoryTaskManager implements TaskManager {
     @Override
     public void deleteTasks() {
         for (Task t : tasks.values()) {
-            if (t.getStartTime() != null) {
-                prioritizedTasks.remove(t);
-                LocalDateTime startTime = t.getStartTime();
-                LocalDateTime endTime = t.getEndTime();
-                int startIndex = timeToIndex(startTime);
-                int endIndex = timeToIndex(endTime);
-                freeIntervals(startIndex, endIndex);
-            }
+            if (t.getStartTime() != null) prioritizedTasks.remove(t);
             historyManager.remove(t.getId());
         }
         tasks.clear();
@@ -389,14 +278,7 @@ public class InMemoryTaskManager implements TaskManager {
                 updateEpicStatus(epic);
                 updateEpicTime(epic);
             }
-            if (s.getStartTime() != null) {
-                prioritizedTasks.remove(s);
-                LocalDateTime startTime = s.getStartTime();
-                LocalDateTime endTime = s.getEndTime();
-                int startIndex = timeToIndex(startTime);
-                int endIndex = timeToIndex(endTime);
-                freeIntervals(startIndex, endIndex);
-            }
+            if (s.getStartTime() != null) prioritizedTasks.remove(s);
             historyManager.remove(s.getId());
         }
         subtasks.clear();
@@ -408,14 +290,7 @@ public class InMemoryTaskManager implements TaskManager {
             for (Integer subId : e.getSubtaskIds()) {
                 Subtask s = subtasks.remove(subId);
                 if (s != null) {
-                    if (s.getStartTime() != null) {
-                        prioritizedTasks.remove(s);
-                        LocalDateTime startTime = s.getStartTime();
-                        LocalDateTime endTime = s.getEndTime();
-                        int startIndex = timeToIndex(startTime);
-                        int endIndex = timeToIndex(endTime);
-                        freeIntervals(startIndex, endIndex);
-                    }
+                    if (s.getStartTime() != null) prioritizedTasks.remove(s);
                     historyManager.remove(subId);
                 }
             }
