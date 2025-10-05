@@ -1,5 +1,8 @@
 package ru.practikum.model;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+
 public class Subtask extends Task {
     private final int epicId;
 
@@ -8,7 +11,12 @@ public class Subtask extends Task {
         this.epicId = epicId;
     }
 
-    // ИСПРАВЛЕННЫЙ конструктор копирования
+    public Subtask(String name, String description, Status status, int epicId,
+                   LocalDateTime startTime, Duration duration) {
+        super(name, description, status, startTime, duration);
+        this.epicId = epicId;
+    }
+
     public Subtask(Subtask original) {
         super(original);
         this.epicId = original.epicId;
@@ -30,6 +38,8 @@ public class Subtask extends Task {
                 ", name='" + name + '\'' +
                 ", description='" + description + '\'' +
                 ", status=" + status +
+                ", duration=" + duration +
+                ", startTime=" + startTime +
                 ", epicId=" + epicId +
                 '}';
     }
