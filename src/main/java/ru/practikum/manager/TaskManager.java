@@ -42,9 +42,11 @@ public interface TaskManager {
 
     List<Task> getHistory();
 
-    void deleteTasks();        // Удалить все задачи
+    void deleteTasks();
 
-    void deleteSubtasks();     // Удалить все подзадачи
+    void deleteSubtasks();
 
-    void deleteEpics();        // Удалить все эпики
+    void deleteEpics();
+
+    List<Task> getPrioritizedTasks();
 }
