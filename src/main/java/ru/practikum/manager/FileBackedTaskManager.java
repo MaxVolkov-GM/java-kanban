@@ -1,5 +1,7 @@
 package ru.practikum.manager;
 
+import ru.practikum.exception.ManagerSaveException;
+import ru.practikum.exception.ManagerLoadException;
 import ru.practikum.model.Epic;
 import ru.practikum.model.Status;
 import ru.practikum.model.Subtask;
@@ -34,22 +36,17 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 writer.write(taskToString(subtask) + "\n");
             }
 
-            // Сохраняем историю просмотров
-            writer.write("\n");
-            writer.write(historyToString(historyManager));
-
         } catch (IOException e) {
             throw new ManagerSaveException("Ошибка сохранения в файл", e);
         }
     }
 
     private String taskToString(Task task) {
-        String type = getType(task).toString();
         String epicId = (task instanceof Subtask) ? String.valueOf(((Subtask) task).getEpicId()) : "";
 
         return String.format("%d,%s,%s,%s,%s,%s",
             task.getId(),
-            type,
+            task.getType(),
             escapeString(task.getName()),
             task.getStatus(),
             escapeString(task.getDescription()),
@@ -61,12 +58,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             return "\"" + text.replace("\"", "\"\"") + "\"";
         }
         return text;
-    }
-
-    private TaskType getType(Task task) {
-        if (task instanceof Epic) return TaskType.EPIC;
-        if (task instanceof Subtask) return TaskType.SUBTASK;
-        return TaskType.TASK;
     }
 
     private static Task fromString(String value) {
@@ -87,7 +78,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             case EPIC:
                 Epic epic = new Epic(name, description);
                 epic.setId(id);
-                // Статус эпика вычисляется автоматически на основе подзадач
+                // Статус будет вычислен автоматически при добавлении подзадач
                 return epic;
             case SUBTASK:
                 int epicId = Integer.parseInt(epicIdStr);
@@ -125,33 +116,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         return text;
     }
 
-    // Метод для сериализации истории
-    public static String historyToString(HistoryManager manager) {
-        List<Task> history = manager.getHistory();
-        List<String> historyIds = new ArrayList<>();
-        for (Task task : history) {
-            historyIds.add(String.valueOf(task.getId()));
-        }
-        return String.join(",", historyIds);
-    }
-
-    // Метод для десериализации истории
-    public static List<Integer> historyFromString(String value) {
-        List<Integer> historyIds = new ArrayList<>();
-        if (value == null || value.trim().isEmpty()) {
-            return historyIds;
-        }
-        String[] ids = value.split(",");
-        for (String id : ids) {
-            try {
-                historyIds.add(Integer.parseInt(id.trim()));
-            } catch (NumberFormatException e) {
-                // Игнорируем некорректные ID
-            }
-        }
-        return historyIds;
-    }
-
     public static FileBackedTaskManager loadFromFile(File file) {
         FileBackedTaskManager manager = new FileBackedTaskManager(file);
 
@@ -163,38 +127,21 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             String content = Files.readString(file.toPath());
             String[] lines = content.split("\n");
 
-            boolean historySection = false;
-            List<Integer> historyIds = new ArrayList<>();
-
-            for (int i = 0; i < lines.length; i++) {
+            for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
+                if (line.isEmpty()) continue;
 
-                if (line.isEmpty()) {
-                    historySection = true;
-                    continue;
-                }
-
-                if (i == 0 && line.startsWith("id,type")) {
-                    continue; // пропускаем заголовок
-                }
-
-                if (!historySection) {
-                    Task task = fromString(line);
-                    if (task instanceof Epic) {
-                        manager.epics.put(task.getId(), (Epic) task);
-                    } else if (task instanceof Subtask) {
-                        manager.subtasks.put(task.getId(), (Subtask) task);
-                    } else {
-                        manager.tasks.put(task.getId(), task);
-                    }
-
-                    if (task.getId() > manager.sequence) {
-                        manager.sequence = task.getId();
-                    }
+                Task task = fromString(line);
+                if (task instanceof Epic) {
+                    manager.epics.put(task.getId(), (Epic) task);
+                } else if (task instanceof Subtask) {
+                    manager.subtasks.put(task.getId(), (Subtask) task);
                 } else {
-                    // Загружаем историю
-                    historyIds = historyFromString(line);
-                    break; // история всегда последняя
+                    manager.tasks.put(task.getId(), task);
+                }
+
+                if (task.getId() > manager.sequence) {
+                    manager.sequence = task.getId();
                 }
             }
 
@@ -206,30 +153,16 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // Восстанавливаем историю просмотров
-            for (Integer taskId : historyIds) {
-                Task task = manager.findTaskById(taskId);
-                if (task != null) {
-                    manager.historyManager.add(task);
-                }
+            // Вычисляем статусы эпиков один раз после загрузки всех подзадач
+            for (Epic epic : manager.epics.values()) {
+                manager.updateEpicStatus(epic);
             }
 
         } catch (IOException e) {
-            throw new ManagerSaveException("Ошибка загрузки из файла", e);
+            throw new ManagerLoadException("Ошибка загрузки из файла", e);
         }
 
         return manager;
-    }
-
-    // Вспомогательный метод для поиска задачи по ID
-    private Task findTaskById(int id) {
-        Task task = tasks.get(id);
-        if (task != null) return task;
-
-        task = epics.get(id);
-        if (task != null) return task;
-
-        return subtasks.get(id);
     }
 
     @Override
