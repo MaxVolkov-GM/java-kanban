@@ -11,13 +11,12 @@ public class Subtask extends Task {
         this.epicId = epicId;
     }
 
-    public Subtask(String name, String description, Status status, int epicId, 
+    public Subtask(String name, String description, Status status, int epicId,
                    LocalDateTime startTime, Duration duration) {
         super(name, description, status, startTime, duration);
         this.epicId = epicId;
     }
 
-    // ИСПРАВЛЕННЫЙ конструктор копирования
     public Subtask(Subtask original) {
         super(original);
         this.epicId = original.epicId;

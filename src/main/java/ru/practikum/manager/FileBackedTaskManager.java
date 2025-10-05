@@ -47,9 +47,9 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     private String taskToString(Task task) {
         String epicId = (task instanceof Subtask) ? String.valueOf(((Subtask) task).getEpicId()) : "";
-        String startTimeStr = task.getStartTime() != null ? 
+        String startTimeStr = task.getStartTime() != null ?
             task.getStartTime().format(DATE_TIME_FORMATTER) : "";
-        String durationStr = task.getDuration() != null ? 
+        String durationStr = task.getDuration() != null ?
             String.valueOf(task.getDuration().toMinutes()) : "";
 
         return String.format("%d,%s,%s,%s,%s,%s,%s,%s",
@@ -166,7 +166,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // Восстанавливаем связи для подзадач
             for (Subtask subtask : manager.subtasks.values()) {
                 Epic epic = manager.epics.get(subtask.getEpicId());
                 if (epic != null) {
