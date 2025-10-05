@@ -42,14 +42,14 @@ public class InMemoryTaskManager implements TaskManager {
         if (task.getStartTime() == null || task.getDuration() == null) {
             return true;
         }
-        
+
         Integer startIndex = timeToGridIndex(task.getStartTime());
         Integer endIndex = timeToGridIndex(task.getEndTime());
-        
+
         if (startIndex == null || endIndex == null) {
             return true; // Задача вне сетки - пропускаем проверку
         }
-        
+
         for (int i = startIndex; i < endIndex; i++) {
             if (scheduleGrid[i]) {
                 return false;
@@ -63,10 +63,10 @@ public class InMemoryTaskManager implements TaskManager {
         if (task.getStartTime() == null || task.getDuration() == null) {
             return;
         }
-        
+
         Integer startIndex = timeToGridIndex(task.getStartTime());
         Integer endIndex = timeToGridIndex(task.getEndTime());
-        
+
         if (startIndex != null && endIndex != null) {
             for (int i = startIndex; i < endIndex; i++) {
                 scheduleGrid[i] = true;
@@ -79,10 +79,10 @@ public class InMemoryTaskManager implements TaskManager {
         if (task.getStartTime() == null || task.getDuration() == null) {
             return;
         }
-        
+
         Integer startIndex = timeToGridIndex(task.getStartTime());
         Integer endIndex = timeToGridIndex(task.getEndTime());
-        
+
         if (startIndex != null && endIndex != null) {
             for (int i = startIndex; i < endIndex; i++) {
                 scheduleGrid[i] = false;
@@ -95,12 +95,12 @@ public class InMemoryTaskManager implements TaskManager {
         if (newTask.getStartTime() == null || newTask.getEndTime() == null) {
             return false;
         }
-        
+
         // 1. Быстрая проверка через сетку O(1)
         if (!areGridIntervalsFree(newTask)) {
             return true;
         }
-        
+
         // 2. Проверка через Stream API для задач вне сетки
         return prioritizedTasks.stream()
                 .filter(existingTask -> existingTask.getId() != newTask.getId())
