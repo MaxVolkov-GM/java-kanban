@@ -38,15 +38,7 @@ public class Epic extends Task {
         subtaskIds.remove((Integer) id);
     }
 
-    @Override
-    public Duration getDuration() {
-        return duration != null ? duration : Duration.ZERO;
-    }
-
-    @Override
-    public LocalDateTime getStartTime() {
-        return startTime;
-    }
+    // УБРАЛИ переопределения getStartTime() и getDuration() - используем родительские
 
     @Override
     public LocalDateTime getEndTime() {
@@ -57,13 +49,7 @@ public class Epic extends Task {
         this.endTime = endTime;
     }
 
-    public void setCalculatedStartTime(LocalDateTime startTime) {
-        this.startTime = startTime;
-    }
-
-    public void setCalculatedDuration(Duration duration) {
-        this.duration = duration;
-    }
+    // УБРАЛИ setCalculatedStartTime и setCalculatedDuration - используем сеттеры родителя
 
     @Override
     public String toString() {
@@ -72,9 +58,9 @@ public class Epic extends Task {
                 ", name='" + name + '\'' +
                 ", description='" + description + '\'' +
                 ", status=" + status +
-                ", duration=" + getDuration() +
-                ", startTime=" + getStartTime() +
-                ", endTime=" + getEndTime() +
+                ", duration=" + duration + // ПРЯМОЙ ДОСТУП К ПОЛЯМ
+                ", startTime=" + startTime + // ПРЯМОЙ ДОСТУП К ПОЛЯМ
+                ", endTime=" + endTime +
                 ", subtaskIds=" + subtaskIds +
                 '}';
     }

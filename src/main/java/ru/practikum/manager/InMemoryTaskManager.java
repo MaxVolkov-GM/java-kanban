@@ -59,7 +59,7 @@ public class InMemoryTaskManager implements TaskManager {
     }
 
     // Занять интервалы в сетке
-    private void occupyGridIntervals(Task task) {
+    protected void occupyGridIntervals(Task task) {
         if (task.getStartTime() == null || task.getDuration() == null) {
             return;
         }
@@ -102,12 +102,11 @@ public class InMemoryTaskManager implements TaskManager {
         }
 
         // 2. Проверка через Stream API для задач вне сетки
+        // УБРАЛИ ЛИШНИЕ ФИЛЬТРЫ - в prioritizedTasks уже только задачи с временем
         return prioritizedTasks.stream()
                 .filter(existingTask -> existingTask.getId() != newTask.getId())
-                .filter(existingTask -> existingTask.getStartTime() != null)
-                .filter(existingTask -> existingTask.getEndTime() != null)
                 .filter(existingTask -> {
-                    // Проверяем только задачи вне сетки или те, что не попали в сетку
+                    // Проверяем только задачи вне сетки
                     Integer startIndex = timeToGridIndex(existingTask.getStartTime());
                     return startIndex == null; // Если null - задача вне сетки
                 })
@@ -204,7 +203,7 @@ public class InMemoryTaskManager implements TaskManager {
         if (epic == null) return -1;
         epic.setId(++sequence);
         epics.put(epic.getId(), epic);
-        updateEpicTime(epic);
+        // УБРАЛИ updateEpicTime() - у нового эпика нет подзадач, время будет сброшено
         return epic.getId();
     }
 
@@ -215,7 +214,7 @@ public class InMemoryTaskManager implements TaskManager {
         Epic savedEpic = epics.get(epic.getId());
         savedEpic.setName(epic.getName());
         savedEpic.setDescription(epic.getDescription());
-        updateEpicTime(savedEpic);
+        // УБРАЛИ updateEpicTime() - при обновлении эпика подзадачи не меняются
     }
 
     @Override
@@ -261,7 +260,7 @@ public class InMemoryTaskManager implements TaskManager {
         subtasks.put(subtask.getId(), subtask);
         epic.addSubtaskId(subtask.getId());
         updateEpicStatus(epic);
-        updateEpicTime(epic);
+        updateEpicTime(epic); // ОСТАВИЛИ - при создании подзадачи время эпика меняется
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
@@ -294,7 +293,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         subtasks.put(subtask.getId(), subtask);
         updateEpicStatus(epic);
-        updateEpicTime(epic);
+        updateEpicTime(epic); // ОСТАВИЛИ - при обновлении подзадачи время эпика может измениться
 
         if (subtask.getStartTime() != null) {
             prioritizedTasks.add(subtask);
@@ -310,7 +309,7 @@ public class InMemoryTaskManager implements TaskManager {
             if (epic != null) {
                 epic.removeSubtaskId(id);
                 updateEpicStatus(epic);
-                updateEpicTime(epic);
+                updateEpicTime(epic); // ОСТАВИЛИ - при удалении подзадачи время эпика меняется
             }
             historyManager.remove(id);
             if (subtask.getStartTime() != null) {
@@ -429,8 +428,8 @@ public class InMemoryTaskManager implements TaskManager {
 
     protected void updateEpicTime(Epic epic) {
         if (epic.getSubtaskIds().isEmpty()) {
-            epic.setCalculatedStartTime(null);
-            epic.setCalculatedDuration(Duration.ZERO);
+            epic.setStartTime(null);
+            epic.setDuration(Duration.ZERO);
             epic.setEndTime(null);
             return;
         }
@@ -450,8 +449,8 @@ public class InMemoryTaskManager implements TaskManager {
             if (s.getDuration() != null) total = total.plus(s.getDuration());
         }
 
-        epic.setCalculatedStartTime(earliest);
-        epic.setCalculatedDuration(total);
+        epic.setStartTime(earliest);
+        epic.setDuration(total);
         epic.setEndTime(latest);
     }
 }
