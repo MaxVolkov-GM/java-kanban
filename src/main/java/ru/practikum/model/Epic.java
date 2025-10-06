@@ -10,6 +10,7 @@ public class Epic extends Task {
 
     public Epic(String name, String description) {
         super(name, description, Status.NEW);
+        this.duration = java.time.Duration.ZERO; // Устанавливаем Duration.ZERO по умолчанию
     }
 
     public Epic(Epic original) {
@@ -37,8 +38,6 @@ public class Epic extends Task {
         subtaskIds.remove((Integer) id);
     }
 
-    // УБРАЛИ переопределения getStartTime() и getDuration() - используем родительские
-
     @Override
     public LocalDateTime getEndTime() {
         return endTime;
@@ -47,8 +46,6 @@ public class Epic extends Task {
     public void setEndTime(LocalDateTime endTime) {
         this.endTime = endTime;
     }
-
-    // УБРАЛИ setCalculatedStartTime и setCalculatedDuration - используем сеттеры родителя
 
     @Override
     public String toString() {

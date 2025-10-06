@@ -17,7 +17,8 @@ public class InMemoryTaskManager implements TaskManager {
     protected int sequence = 0;
     protected final HistoryManager historyManager = Managers.getDefaultHistory();
     protected final Set<Task> prioritizedTasks = new TreeSet<>(
-            Comparator.comparing(Task::getStartTime, Comparator.nullsLast(Comparator.naturalOrder()))
+            Comparator.comparing(Task::getStartTime, 
+                    Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(Task::getId)
     );
 
@@ -429,7 +430,7 @@ public class InMemoryTaskManager implements TaskManager {
     protected void updateEpicTime(Epic epic) {
         if (epic.getSubtaskIds().isEmpty()) {
             epic.setStartTime(null);
-            epic.setDuration(Duration.ZERO);
+            epic.setDuration(Duration.ZERO); // ИСПРАВЛЕНИЕ: Duration.ZERO вместо null
             epic.setEndTime(null);
             return;
         }
