@@ -12,11 +12,15 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 public class FileBackedTaskManager extends InMemoryTaskManager {
     private final File file;
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public FileBackedTaskManager(File file) {
         this.file = file;
@@ -24,7 +28,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     protected void save() {
         try (FileWriter writer = new FileWriter(file)) {
-            writer.write("id,type,name,status,description,epic\n");
+            writer.write("id,type,name,status,description,startTime,duration,epic\n");
 
             for (Task task : getAllTasks()) {
                 writer.write(taskToString(task) + "\n");
@@ -43,13 +47,19 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     private String taskToString(Task task) {
         String epicId = (task instanceof Subtask) ? String.valueOf(((Subtask) task).getEpicId()) : "";
+        String startTimeStr = task.getStartTime() != null ?
+            task.getStartTime().format(DATE_TIME_FORMATTER) : "";
+        String durationStr = task.getDuration() != null ?
+            String.valueOf(task.getDuration().toMinutes()) : "";
 
-        return String.format("%d,%s,%s,%s,%s,%s",
+        return String.format("%d,%s,%s,%s,%s,%s,%s,%s",
             task.getId(),
             task.getType(),
             escapeString(task.getName()),
             task.getStatus(),
             escapeString(task.getDescription()),
+            startTimeStr,
+            durationStr,
             epicId);
     }
 
@@ -68,21 +78,32 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         String name = unescapeString(parts[2]);
         Status status = Status.valueOf(parts[3]);
         String description = unescapeString(parts[4]);
-        String epicIdStr = parts.length > 5 ? parts[5] : "";
+        String startTimeStr = parts.length > 5 ? parts[5] : "";
+        String durationStr = parts.length > 6 ? parts[6] : "";
+        String epicIdStr = parts.length > 7 ? parts[7] : "";
+
+        LocalDateTime startTime = null;
+        Duration duration = null;
+
+        if (!startTimeStr.isEmpty()) {
+            startTime = LocalDateTime.parse(startTimeStr, DATE_TIME_FORMATTER);
+        }
+        if (!durationStr.isEmpty()) {
+            duration = Duration.ofMinutes(Long.parseLong(durationStr));
+        }
 
         switch (type) {
             case TASK:
-                Task task = new Task(name, description, status);
+                Task task = new Task(name, description, status, startTime, duration);
                 task.setId(id);
                 return task;
             case EPIC:
                 Epic epic = new Epic(name, description);
                 epic.setId(id);
-                // Статус будет вычислен автоматически при добавлении подзадач
                 return epic;
             case SUBTASK:
                 int epicId = Integer.parseInt(epicIdStr);
-                Subtask subtask = new Subtask(name, description, status, epicId);
+                Subtask subtask = new Subtask(name, description, status, epicId, startTime, duration);
                 subtask.setId(id);
                 return subtask;
             default:
@@ -127,6 +148,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             String content = Files.readString(file.toPath());
             String[] lines = content.split("\n");
 
+            // Восстанавливаем задачи
             for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
                 if (line.isEmpty()) continue;
@@ -145,7 +167,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // Восстанавливаем связи для подзадач
+            // Восстанавливаем связи подзадач с эпиками
             for (Subtask subtask : manager.subtasks.values()) {
                 Epic epic = manager.epics.get(subtask.getEpicId());
                 if (epic != null) {
@@ -153,9 +175,12 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // Вычисляем статусы эпиков один раз после загрузки всех подзадач
+            // ВАЖНО: Восстанавливаем prioritizedTasks и сетку
+            manager.restorePrioritizedTasksAndGrid();
+
+            // Пересчитываем время для всех эпиков
             for (Epic epic : manager.epics.values()) {
-                manager.updateEpicStatus(epic);
+                manager.updateEpicTime(epic);
             }
 
         } catch (IOException e) {
@@ -163,6 +188,28 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         }
 
         return manager;
+    }
+
+    // Восстановление prioritizedTasks и сетки после загрузки
+    private void restorePrioritizedTasksAndGrid() {
+        prioritizedTasks.clear();
+
+        // Восстанавливаем prioritizedTasks
+        for (Task task : tasks.values()) {
+            if (task.getStartTime() != null) {
+                prioritizedTasks.add(task);
+            }
+        }
+        for (Subtask subtask : subtasks.values()) {
+            if (subtask.getStartTime() != null) {
+                prioritizedTasks.add(subtask);
+            }
+        }
+
+        // Восстанавливаем сетку
+        for (Task task : prioritizedTasks) {
+            occupyGridIntervals(task);
+        }
     }
 
     @Override
