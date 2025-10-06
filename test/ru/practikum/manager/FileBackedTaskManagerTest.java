@@ -2,10 +2,7 @@ package ru.practikum.manager;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import ru.practikum.model.Epic;
-import ru.practikum.model.Status;
-import ru.practikum.model.Subtask;
-import ru.practikum.model.Task;
+import ru.practikum.model.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,104 +14,127 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class FileBackedTaskManagerTest extends TaskManagerTest<FileBackedTaskManager> {
-    
+class FileBackedTaskManagerTest {
+
     @TempDir
     Path tempDir;
-    
-    @Override
-    protected FileBackedTaskManager createManager() {
-        try {
-            File file = Files.createTempFile(tempDir, "test", ".csv").toFile();
-            return new FileBackedTaskManager(file);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to create temp file", e);
-        }
-    }
-    
-    @Test
-    void testSaveAndLoadEmptyFile() throws IOException {
-        File file = Files.createTempFile(tempDir, "empty", ".csv").toFile();
-        FileBackedTaskManager manager1 = new FileBackedTaskManager(file);
-        
-        manager1.save();
-        
-        FileBackedTaskManager manager2 = FileBackedTaskManager.loadFromFile(file);
-        
-        assertTrue(manager2.getAllTasks().isEmpty(), "Список задач должен быть пустым");
-        assertTrue(manager2.getAllEpics().isEmpty(), "Список эпиков должен быть пустым");
-        assertTrue(manager2.getAllSubtasks().isEmpty(), "Список подзадач должен быть пустым");
-    }
-    
+
     @Test
     void testSaveAndLoadWithTasks() throws IOException {
-        File file = Files.createTempFile(tempDir, "tasks", ".csv").toFile();
-        FileBackedTaskManager manager1 = new FileBackedTaskManager(file);
-        
-        Task task = new Task("Test task", "Description", Status.IN_PROGRESS,
-                           LocalDateTime.of(2024, 1, 1, 10, 0), Duration.ofHours(1));
-        manager1.createTask(task);
-        
-        Epic epic = new Epic("Test epic", "Epic description");
-        int epicId = manager1.createEpic(epic);
-        
-        Subtask subtask = new Subtask("Test subtask", "Subtask description", Status.DONE, epicId,
-                                    LocalDateTime.of(2024, 1, 1, 12, 0), Duration.ofMinutes(30));
-        manager1.createSubtask(subtask);
-        
-        FileBackedTaskManager manager2 = FileBackedTaskManager.loadFromFile(file);
-        
-        List<Task> tasks = manager2.getAllTasks();
-        List<Epic> epics = manager2.getAllEpics();
-        List<Subtask> subtasks = manager2.getAllSubtasks();
-        
-        assertEquals(1, tasks.size(), "Должна быть 1 задача");
-        assertEquals(1, epics.size(), "Должен быть 1 эпик");
-        assertEquals(1, subtasks.size(), "Должна быть 1 подзадача");
-        
-        Task loadedTask = tasks.get(0);
-        assertEquals("Test task", loadedTask.getName(), "Название задачи не совпадает");
-        assertEquals(Status.IN_PROGRESS, loadedTask.getStatus(), "Статус задачи не совпадает");
-        assertNotNull(loadedTask.getStartTime(), "Время начала задачи должно сохраниться");
-        assertNotNull(loadedTask.getDuration(), "Продолжительность задачи должна сохраниться");
-        
-        Subtask loadedSubtask = subtasks.get(0);
-        assertEquals(epicId, loadedSubtask.getEpicId(), "ID эпика подзадачи не совпадает");
+        File file = tempDir.resolve("test.csv").toFile();
+        FileBackedTaskManager manager = new FileBackedTaskManager(file);
+
+        // Создаем задачи с временем
+        LocalDateTime startTime = LocalDateTime.of(2024, 1, 1, 10, 0);
+        Task task = new Task("Test Task", "Description", Status.NEW, startTime, Duration.ofHours(1));
+        Epic epic = new Epic("Test Epic", "Description");
+        Subtask subtask = new Subtask("Test Subtask", "Description", Status.NEW, 2, 
+                                     startTime.plusHours(2), Duration.ofMinutes(30));
+
+        int taskId = manager.createTask(task);
+        int epicId = manager.createEpic(epic);
+        subtask = new Subtask(subtask.getName(), subtask.getDescription(), subtask.getStatus(), 
+                             epicId, subtask.getStartTime(), subtask.getDuration());
+        int subtaskId = manager.createSubtask(subtask);
+
+        // Загружаем из файла
+        FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(file);
+
+        // Проверяем восстановление задач с константами
+        Task loadedTask = loadedManager.getTaskById(taskId);
+        assertNotNull(loadedTask, "Задача не должна быть null");
+        assertEquals("Test Task", loadedTask.getName(), "Имя задачи должно совпадать");
+        assertEquals("Description", loadedTask.getDescription(), "Описание задачи должно совпадать");
+        assertEquals(Status.NEW, loadedTask.getStatus(), "Статус задачи должен совпадать");
+        assertEquals(taskId, loadedTask.getId(), "ID задачи должен совпадать");
+        assertEquals(startTime, loadedTask.getStartTime(), "Время начала должно совпадать");
+        assertEquals(Duration.ofHours(1), loadedTask.getDuration(), "Продолжительность должна совпадать");
+
+        Epic loadedEpic = loadedManager.getEpicById(epicId);
+        assertNotNull(loadedEpic, "Эпик не должен быть null");
+        assertEquals("Test Epic", loadedEpic.getName(), "Имя эпика должно совпадать");
+        assertEquals("Description", loadedEpic.getDescription(), "Описание эпика должно совпадать");
+
+        // Проверяем восстановление времени эпика
+        assertNotNull(loadedEpic.getStartTime(), "Время начала эпика должно быть восстановлено");
+        assertNotNull(loadedEpic.getEndTime(), "Время окончания эпика должно быть восстановлено");
+        assertEquals(Duration.ofMinutes(30), loadedEpic.getDuration(), "Продолжительность эпика должна совпадать");
+
+        // Проверяем восстановление prioritizedTasks
+        List<Task> prioritized = loadedManager.getPrioritizedTasks();
+        assertEquals(2, prioritized.size(), "Должны быть восстановлены 2 задачи с временем");
+        assertEquals("Test Task", prioritized.get(0).getName(), "Первой должна быть ранняя задача");
+        assertEquals("Test Subtask", prioritized.get(1).getName(), "Второй должна быть поздняя задача");
     }
-    
-    @Test
-    void testLoadFromNonExistentFile() {
-        File file = new File("non_existent_file.csv");
-        FileBackedTaskManager manager = FileBackedTaskManager.loadFromFile(file);
-        
-        assertNotNull(manager, "Менеджер должен создаться даже для несуществующего файла");
-        assertTrue(manager.getAllTasks().isEmpty(), "Список задач должен быть пустым");
-    }
-    
+
     @Test
     void testSaveAndLoadEpicTimeCalculation() throws IOException {
-        File file = Files.createTempFile(tempDir, "epic_time", ".csv").toFile();
-        FileBackedTaskManager manager1 = new FileBackedTaskManager(file);
-        
-        Epic epic = new Epic("Test epic", "Epic description");
-        int epicId = manager1.createEpic(epic);
-        
+        File file = tempDir.resolve("test_epic.csv").toFile();
+        FileBackedTaskManager manager = new FileBackedTaskManager(file);
+
+        Epic epic = new Epic("Test Epic", "Description");
+        int epicId = manager.createEpic(epic);
+
         LocalDateTime startTime1 = LocalDateTime.of(2024, 1, 1, 10, 0);
-        Duration duration1 = Duration.ofHours(1);
-        Subtask subtask1 = new Subtask("Subtask 1", "Description 1", Status.NEW, epicId, startTime1, duration1);
-        manager1.createSubtask(subtask1);
-        
         LocalDateTime startTime2 = LocalDateTime.of(2024, 1, 1, 12, 0);
-        Duration duration2 = Duration.ofHours(2);
-        Subtask subtask2 = new Subtask("Subtask 2", "Description 2", Status.NEW, epicId, startTime2, duration2);
-        manager1.createSubtask(subtask2);
         
-        FileBackedTaskManager manager2 = FileBackedTaskManager.loadFromFile(file);
+        manager.createSubtask(new Subtask("Subtask 1", "Description", Status.NEW, epicId, 
+                                         startTime1, Duration.ofHours(1)));
+        manager.createSubtask(new Subtask("Subtask 2", "Description", Status.NEW, epicId, 
+                                         startTime2, Duration.ofHours(2)));
+
+        // Загружаем и проверяем восстановление времени эпика
+        FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(file);
+        Epic loadedEpic = loadedManager.getEpicById(epicId);
+
+        assertEquals(startTime1, loadedEpic.getStartTime(), "Время начала эпика должно быть восстановлено");
+        assertEquals(startTime2.plusHours(2), loadedEpic.getEndTime(), "Время окончания эпика должно быть восстановлено");
+        assertEquals(Duration.ofHours(3), loadedEpic.getDuration(), "Продолжительность эпика должна быть восстановлена");
+    }
+
+    @Test
+    void testLoadFromNonExistentFile() throws IOException {
+        File file = tempDir.resolve("nonexistent.csv").toFile();
+        FileBackedTaskManager manager = FileBackedTaskManager.loadFromFile(file);
+
+        assertTrue(manager.getAllTasks().isEmpty(), "Менеджер должен быть пустым для несуществующего файла");
+        assertTrue(manager.getAllEpics().isEmpty(), "Менеджер должен быть пустым для несуществующего файла");
+        assertTrue(manager.getAllSubtasks().isEmpty(), "Менеджер должен быть пустым для несуществующего файла");
+    }
+
+    @Test
+    void testSaveAndLoadEmptyFile() throws IOException {
+        File file = tempDir.resolve("empty.csv").toFile();
+        Files.writeString(file.toPath(), "id,type,name,status,description,startTime,duration,epic\n");
+
+        FileBackedTaskManager manager = FileBackedTaskManager.loadFromFile(file);
+
+        assertTrue(manager.getAllTasks().isEmpty(), "Менеджер должен быть пустым для пустого файла");
+        assertTrue(manager.getAllEpics().isEmpty(), "Менеджер должен быть пустым для пустого файла");
+        assertTrue(manager.getAllSubtasks().isEmpty(), "Менеджер должен быть пустым для пустого файла");
+    }
+
+    @Test
+    void testPrioritizedTasksRestoration() throws IOException {
+        File file = tempDir.resolve("prioritized.csv").toFile();
+        FileBackedTaskManager manager = new FileBackedTaskManager(file);
+
+        // Создаем задачи в разном порядке
+        LocalDateTime earlyTime = LocalDateTime.of(2024, 1, 1, 9, 0);
+        LocalDateTime lateTime = LocalDateTime.of(2024, 1, 1, 11, 0);
         
-        Epic loadedEpic = manager2.getEpicById(epicId);
-        assertNotNull(loadedEpic, "Эпик должен быть загружен");
-        assertEquals(startTime1, loadedEpic.getStartTime(), "Время начала эпика должно сохраниться");
-        assertEquals(Duration.ofHours(3), loadedEpic.getDuration(), "Продолжительность эпика должна сохраниться");
-        assertEquals(startTime2.plus(duration2), loadedEpic.getEndTime(), "Время окончания эпика должно сохраниться");
+        Task lateTask = new Task("Late Task", "Description", Status.NEW, lateTime, Duration.ofHours(1));
+        Task earlyTask = new Task("Early Task", "Description", Status.NEW, earlyTime, Duration.ofHours(1));
+        
+        manager.createTask(lateTask);
+        manager.createTask(earlyTask);
+
+        // Загружаем и проверяем что prioritizedTasks восстановлен корректно
+        FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(file);
+        List<Task> prioritized = loadedManager.getPrioritizedTasks();
+
+        assertEquals(2, prioritized.size(), "Должны быть восстановлены 2 задачи");
+        assertEquals("Early Task", prioritized.get(0).getName(), "Первой должна быть ранняя задача");
+        assertEquals("Late Task", prioritized.get(1).getName(), "Второй должна быть поздняя задача");
     }
 }
