@@ -51,14 +51,14 @@ public class TaskHandler extends BaseHttpHandler implements HttpHandler {
                             int newId = manager.createTask(task);
                             sendText(exchange, "{\"id\":" + newId + "}", 201);
                         } catch (IllegalArgumentException e) {
-                            sendText(exchange, "{\"error\":\"Задача пересекается по времени с другой задачей\"}", 400);
+                            sendHasInteractions(exchange);
                         }
                     } else {
                         try {
                             manager.updateTask(task);
                             sendText(exchange, "{\"id\":" + task.getId() + "}", 201);
                         } catch (IllegalArgumentException e) {
-                            sendText(exchange, "{\"error\":\"Задача пересекается по времени с другой задачей\"}", 400);
+                            sendHasInteractions(exchange);
                         }
                     }
                     break;
@@ -73,11 +73,10 @@ public class TaskHandler extends BaseHttpHandler implements HttpHandler {
 
                 default:
                     sendText(exchange, "{\"error\":\"Метод не поддерживается\"}", 405);
-                    break;
             }
         } catch (Exception e) {
             e.printStackTrace();
-            sendText(exchange, "{\"error\":\"Внутренняя ошибка сервера\"}", 500);
+            sendServerError(exchange);
         }
     }
 }

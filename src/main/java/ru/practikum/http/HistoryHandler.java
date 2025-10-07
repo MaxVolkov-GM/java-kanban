@@ -23,11 +23,11 @@ public class HistoryHandler extends BaseHttpHandler implements HttpHandler {
             if ("GET".equals(exchange.getRequestMethod())) {
                 sendText(exchange, gson.toJson(manager.getHistory()));
             } else {
-                sendText(exchange, "{\"error\":\"Метод не поддерживается\"}", 405);
+                sendServerError(exchange);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            sendText(exchange, "{\"error\":\"Внутренняя ошибка сервера\"}", 500);
+            sendServerError(exchange);
         }
     }
 }

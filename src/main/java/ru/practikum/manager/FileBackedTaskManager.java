@@ -18,7 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FileBackedTaskManager extends InMemoryTaskManager {
+public class FileBackedTaskManager extends ru.practikum.manager.InMemoryTaskManager {
     private final File file;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -148,7 +148,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             String content = Files.readString(file.toPath());
             String[] lines = content.split("\n");
 
-            // Восстанавливаем задачи
             for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
                 if (line.isEmpty()) continue;
@@ -167,7 +166,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // Восстанавливаем связи подзадач с эпиками
             for (Subtask subtask : manager.subtasks.values()) {
                 Epic epic = manager.epics.get(subtask.getEpicId());
                 if (epic != null) {
@@ -175,10 +173,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 }
             }
 
-            // ВАЖНО: Восстанавливаем prioritizedTasks и сетку
             manager.restorePrioritizedTasksAndGrid();
 
-            // Пересчитываем время для всех эпиков
             for (Epic epic : manager.epics.values()) {
                 manager.updateEpicTime(epic);
             }
@@ -190,7 +186,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         return manager;
     }
 
-    // Восстановление prioritizedTasks и сетки после загрузки
     private void restorePrioritizedTasksAndGrid() {
         prioritizedTasks.clear();
 
@@ -206,7 +201,6 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
             }
         }
 
-        // Восстанавливаем сетку
         for (Task task : prioritizedTasks) {
             occupyGridIntervals(task);
         }
