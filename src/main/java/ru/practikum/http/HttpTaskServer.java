@@ -1,4 +1,4 @@
-package ru.practikum.manager;
+package ru.practikum.http;
 
 import com.google.gson.*;
 import com.sun.net.httpserver.HttpServer;

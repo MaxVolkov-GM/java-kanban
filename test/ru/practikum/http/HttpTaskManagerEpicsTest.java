@@ -2,7 +2,7 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
-import ru.practikum.manager.HttpTaskServer;
+import ru.practikum.http.HttpTaskServer;
 import ru.practikum.manager.InMemoryTaskManager;
 import ru.practikum.manager.TaskManager;
 import ru.practikum.model.Epic;

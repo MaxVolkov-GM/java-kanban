@@ -1,5 +1,6 @@
 package ru.practikum.http;
 
+import ru.practikum.http.HttpTaskServer;
 import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
 import ru.practikum.manager.InMemoryTaskManager;

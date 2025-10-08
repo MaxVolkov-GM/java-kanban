@@ -2,11 +2,10 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
-import ru.practikum.manager.HttpTaskServer;
 import ru.practikum.manager.InMemoryTaskManager;
 import ru.practikum.manager.TaskManager;
-import ru.practikum.model.Task;
 import ru.practikum.model.Status;
+import ru.practikum.model.Task;
 
 import java.io.IOException;
 import java.net.URI;
@@ -15,9 +14,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HttpTaskManagerTasksTest {
