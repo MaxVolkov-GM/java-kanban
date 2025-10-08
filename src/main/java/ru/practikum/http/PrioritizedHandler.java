@@ -3,11 +3,10 @@ package ru.practikum.http;
 import com.google.gson.Gson;
 import ru.practikum.manager.TaskManager;
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 
 import java.io.IOException;
 
-public class PrioritizedHandler extends BaseHttpHandler implements HttpHandler {
+public class PrioritizedHandler extends BaseHttpHandler {
 
     public PrioritizedHandler(TaskManager manager, Gson gson) {
         super(manager, gson);
@@ -19,7 +18,7 @@ public class PrioritizedHandler extends BaseHttpHandler implements HttpHandler {
             if ("GET".equals(exchange.getRequestMethod())) {
                 sendText(exchange, gson.toJson(manager.getPrioritizedTasks()), 200);
             } else {
-                sendServerError(exchange);
+                sendMethodNotAllowed(exchange);
             }
         } catch (Exception e) {
             sendServerError(exchange);

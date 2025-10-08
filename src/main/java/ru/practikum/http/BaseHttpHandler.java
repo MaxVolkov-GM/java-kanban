@@ -37,4 +37,12 @@ public abstract class BaseHttpHandler implements HttpHandler {
     protected void sendServerError(HttpExchange exchange) throws IOException {
         sendText(exchange, "{\"error\":\"Internal Server Error\"}", 500);
     }
+
+    protected void sendMethodNotAllowed(HttpExchange exchange) throws IOException {
+        sendText(exchange, "{\"error\":\"Method Not Allowed\"}", 405);
+    }
+
+    protected void sendBadRequest(HttpExchange exchange) throws IOException {
+        sendText(exchange, "{\"error\":\"Bad Request\"}", 400);
+    }
 }

@@ -2,7 +2,6 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
-import ru.practikum.http.BaseHttpHandler;
 import ru.practikum.manager.TaskManager;
 
 import java.io.IOException;
@@ -19,10 +18,9 @@ public class HistoryHandler extends BaseHttpHandler {
             if ("GET".equals(exchange.getRequestMethod())) {
                 sendText(exchange, gson.toJson(manager.getHistory()), 200);
             } else {
-                sendServerError(exchange);
+                sendMethodNotAllowed(exchange);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             sendServerError(exchange);
         }
     }

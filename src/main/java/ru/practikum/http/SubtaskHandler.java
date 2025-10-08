@@ -1,22 +1,20 @@
 package ru.practikum.http;
 
 import com.google.gson.Gson;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import ru.practikum.manager.TaskManager;
 import ru.practikum.model.Subtask;
 
 import java.io.IOException;
 import java.util.List;
 
-public class SubtaskHandler extends BaseHttpHandler implements HttpHandler {
+public class SubtaskHandler extends BaseHttpHandler {
 
     public SubtaskHandler(TaskManager manager, Gson gson) {
         super(manager, gson);
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
+    public void handle(com.sun.net.httpserver.HttpExchange exchange) throws IOException {
         try {
             String method = exchange.getRequestMethod();
             String query = exchange.getRequestURI().getQuery();
@@ -31,10 +29,11 @@ public class SubtaskHandler extends BaseHttpHandler implements HttpHandler {
                     List<Subtask> subtasks = manager.getAllSubtasks();
                     sendText(exchange, gson.toJson(subtasks), 200);
                 }
+
             } else if ("POST".equals(method)) {
                 String body = new String(exchange.getRequestBody().readAllBytes());
                 if (body.isEmpty()) {
-                    sendServerError(exchange);
+                    sendBadRequest(exchange);
                     return;
                 }
                 Subtask subtask = gson.fromJson(body, Subtask.class);
@@ -45,17 +44,20 @@ public class SubtaskHandler extends BaseHttpHandler implements HttpHandler {
                 } catch (IllegalArgumentException e) {
                     sendHasInteractions(exchange);
                 }
+
             } else if ("DELETE".equals(method)) {
                 if (query != null && query.startsWith("id=")) {
                     int id = Integer.parseInt(query.substring(3));
                     manager.deleteSubtaskById(id);
+                    sendText(exchange, "{}", 200);
                 } else {
-                    manager.deleteSubtasks();
+                    sendBadRequest(exchange);
                 }
-                sendText(exchange, "{}", 200);
+
             } else {
-                sendServerError(exchange);
+                sendMethodNotAllowed(exchange);
             }
+
         } catch (Exception e) {
             sendServerError(exchange);
         }

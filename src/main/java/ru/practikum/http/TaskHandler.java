@@ -2,21 +2,19 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import ru.practikum.manager.TaskManager;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import ru.practikum.model.Task;
 
 import java.io.IOException;
 import java.util.List;
 
-public class TaskHandler extends BaseHttpHandler implements HttpHandler {
+public class TaskHandler extends BaseHttpHandler {
 
     public TaskHandler(TaskManager manager, Gson gson) {
         super(manager, gson);
     }
 
     @Override
-    public void handle(HttpExchange exchange) throws IOException {
+    public void handle(com.sun.net.httpserver.HttpExchange exchange) throws IOException {
         try {
             String method = exchange.getRequestMethod();
             String query = exchange.getRequestURI().getQuery();
@@ -31,30 +29,31 @@ public class TaskHandler extends BaseHttpHandler implements HttpHandler {
                     List<Task> tasks = manager.getAllTasks();
                     sendText(exchange, gson.toJson(tasks), 200);
                 }
+
             } else if ("POST".equals(method)) {
                 String body = new String(exchange.getRequestBody().readAllBytes());
                 if (body.isEmpty()) {
-                    sendServerError(exchange);
+                    sendBadRequest(exchange);
                     return;
                 }
                 Task task = gson.fromJson(body, Task.class);
-                if (task.getId() == 0) {
-                    manager.createTask(task);
-                } else {
-                    manager.updateTask(task);
-                }
+                if (task.getId() == 0) manager.createTask(task);
+                else manager.updateTask(task);
                 sendText(exchange, "{}", 201);
+
             } else if ("DELETE".equals(method)) {
                 if (query != null && query.startsWith("id=")) {
                     int id = Integer.parseInt(query.substring(3));
                     manager.deleteTaskById(id);
+                    sendText(exchange, "{}", 200);
                 } else {
-                    manager.deleteTasks();
+                    sendBadRequest(exchange);
                 }
-                sendText(exchange, "{}", 200);
+
             } else {
-                sendServerError(exchange);
+                sendMethodNotAllowed(exchange);
             }
+
         } catch (Exception e) {
             sendServerError(exchange);
         }
