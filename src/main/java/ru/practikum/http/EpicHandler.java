@@ -21,9 +21,24 @@ public class EpicHandler extends BaseHttpHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         try {
-            if ("GET".equals(exchange.getRequestMethod())) {
-                sendText(exchange, gson.toJson(manager.getAllEpics()));
-            } else if ("POST".equals(exchange.getRequestMethod())) {
+            String method = exchange.getRequestMethod();
+            String path = exchange.getRequestURI().getPath();
+            if ("GET".equals(method)) {
+                String[] segments = path.split("/");
+                if (segments.length == 2 && segments[1].equals("epics")) {
+                    sendText(exchange, gson.toJson(manager.getAllEpics()));
+                } else if (segments.length == 3 && segments[1].equals("epics")) {
+                    int id = Integer.parseInt(segments[2]);
+                    Epic epic = manager.getEpicById(id);
+                    if (epic != null) {
+                        sendText(exchange, gson.toJson(epic));
+                    } else {
+                        sendText(exchange, "Epic not found", 404);
+                    }
+                } else {
+                    sendServerError(exchange);
+                }
+            } else if ("POST".equals(method)) {
                 String body = new String(exchange.getRequestBody().readAllBytes());
                 Epic epic = gson.fromJson(body, Epic.class);
                 manager.createEpic(epic);
