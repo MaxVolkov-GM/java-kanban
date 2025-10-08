@@ -2,11 +2,6 @@ package ru.practikum.http;
 
 import com.google.gson.*;
 import com.sun.net.httpserver.HttpServer;
-import ru.practikum.http.*;
-import ru.practikum.http.EpicHandler;
-import ru.practikum.http.HistoryHandler;
-import ru.practikum.http.SubtaskHandler;
-import ru.practikum.http.TaskHandler;
 import ru.practikum.manager.TaskManager;
 
 import java.io.IOException;
@@ -35,7 +30,7 @@ public class HttpTaskServer {
         server.createContext("/subtasks", new SubtaskHandler(manager, gson));
         server.createContext("/epics", new EpicHandler(manager, gson));
         server.createContext("/history", new HistoryHandler(manager, gson));
-        server.createContext("/prioritized", new ru.practikum.http.PrioritizedHandler(manager, gson));
+        server.createContext("/prioritized", new PrioritizedHandler(manager, gson));
     }
 
     public void start() {
