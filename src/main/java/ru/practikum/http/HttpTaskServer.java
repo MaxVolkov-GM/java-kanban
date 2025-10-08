@@ -14,7 +14,6 @@ import java.time.format.DateTimeFormatter;
 public class HttpTaskServer {
 
     private final HttpServer server;
-    private final TaskManager manager;
     private static final int PORT = 8080;
 
     private static final Gson gson = new GsonBuilder()
@@ -23,7 +22,6 @@ public class HttpTaskServer {
             .create();
 
     public HttpTaskServer(TaskManager manager) throws IOException {
-        this.manager = manager;
         server = HttpServer.create(new InetSocketAddress(PORT), 0);
 
         server.createContext("/tasks", new TaskHandler(manager, gson));

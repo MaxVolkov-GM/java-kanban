@@ -4,8 +4,8 @@ import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
 import ru.practikum.manager.InMemoryTaskManager;
 import ru.practikum.manager.TaskManager;
-import ru.practikum.model.Task;
 import ru.practikum.model.Status;
+import ru.practikum.model.Task;
 
 import java.io.IOException;
 import java.net.URI;
@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HttpTaskManagerHistoryTest {
@@ -45,17 +45,13 @@ public class HttpTaskManagerHistoryTest {
     }
 
     @Test
-    public void testGetHistory() throws IOException, InterruptedException {
+    public void testHistory() throws IOException, InterruptedException {
         Task task = new Task("Task 1", "Desc", Status.NEW, LocalDateTime.now(), Duration.ofMinutes(15));
         manager.createTask(task);
 
         HttpClient client = HttpClient.newHttpClient();
         URI uri = URI.create("http://localhost:8080/history");
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .build();
-
+        HttpRequest request = HttpRequest.newBuilder().uri(uri).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode());
     }

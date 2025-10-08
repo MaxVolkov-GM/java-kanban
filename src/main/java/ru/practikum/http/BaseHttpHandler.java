@@ -1,33 +1,40 @@
 package ru.practikum.http;
 
+import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import ru.practikum.manager.TaskManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-public abstract class BaseHttpHandler {
+public abstract class BaseHttpHandler implements HttpHandler {
 
-    protected void sendText(HttpExchange exchange, String text) throws IOException {
-        sendText(exchange, text, 200);
+    protected final TaskManager manager;
+    protected final Gson gson;
+
+    public BaseHttpHandler(TaskManager manager, Gson gson) {
+        this.manager = manager;
+        this.gson = gson;
     }
 
     protected void sendText(HttpExchange exchange, String text, int statusCode) throws IOException {
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().add("Content-Type", "application/json; charset=UTF-8");
-        exchange.sendResponseHeaders(statusCode, bytes.length);
-        exchange.getResponseBody().write(bytes);
+        byte[] resp = text.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json;charset=utf-8");
+        exchange.sendResponseHeaders(statusCode, resp.length);
+        exchange.getResponseBody().write(resp);
         exchange.getResponseBody().close();
     }
 
     protected void sendNotFound(HttpExchange exchange) throws IOException {
-        sendText(exchange, "{\"error\":\"Не найдено\"}", 404);
-    }
-
-    protected void sendServerError(HttpExchange exchange) throws IOException {
-        sendText(exchange, "{\"error\":\"Внутренняя ошибка сервера\"}", 500);
+        sendText(exchange, "{\"error\":\"Not Found\"}", 404);
     }
 
     protected void sendHasInteractions(HttpExchange exchange) throws IOException {
-        sendText(exchange, "{\"error\":\"Невозможно выполнить действие: пересечение по времени с другой задачей\"}", 400);
+        sendText(exchange, "{\"error\":\"Task overlaps with existing\"}", 406);
+    }
+
+    protected void sendServerError(HttpExchange exchange) throws IOException {
+        sendText(exchange, "{\"error\":\"Internal Server Error\"}", 500);
     }
 }

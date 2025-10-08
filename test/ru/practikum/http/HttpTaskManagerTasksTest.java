@@ -14,8 +14,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HttpTaskManagerTasksTest {
@@ -46,45 +47,30 @@ public class HttpTaskManagerTasksTest {
 
     @Test
     public void testCreateAndGetTask() throws IOException, InterruptedException {
-        Task task = new Task("Test Task", "Test description", Status.NEW,
-                LocalDateTime.now(), Duration.ofMinutes(30));
-
-        String taskJson = gson.toJson(task);
+        Task task = new Task("Task 1", "Desc", Status.NEW, LocalDateTime.now(), Duration.ofMinutes(20));
+        String json = gson.toJson(task);
 
         HttpClient client = HttpClient.newHttpClient();
         URI uri = URI.create("http://localhost:8080/tasks");
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(uri)
-                .POST(HttpRequest.BodyPublishers.ofString(taskJson))
-                .build();
-
+        HttpRequest request = HttpRequest.newBuilder().uri(uri).POST(HttpRequest.BodyPublishers.ofString(json)).build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, response.statusCode());
 
-        assertEquals(201, response.statusCode(), "Код ответа при создании задачи должен быть 201");
-
-        // Получаем все задачи
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .build();
-
+        HttpRequest getRequest = HttpRequest.newBuilder().uri(uri).GET().build();
         HttpResponse<String> getResponse = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
-
-        assertEquals(200, getResponse.statusCode(), "Код ответа при получении задач должен быть 200");
+        assertEquals(200, getResponse.statusCode());
 
         Task[] tasksFromServer = gson.fromJson(getResponse.body(), Task[].class);
-        assertEquals(1, tasksFromServer.length, "Должна быть одна задача");
-        assertEquals("Test Task", tasksFromServer[0].getName(), "Имя задачи не совпадает");
+        assertEquals(1, tasksFromServer.length);
+        assertEquals(task.getName(), tasksFromServer[0].getName());
     }
 
     @Test
-    public void testGetNonExistentTask() throws IOException, InterruptedException {
+    public void testTaskNotFound() throws IOException, InterruptedException {
         HttpClient client = HttpClient.newHttpClient();
-        URI uri = URI.create("http://localhost:8080/tasks/999");
-        HttpRequest request = HttpRequest.newBuilder().uri(uri).GET().build();
-
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        assertEquals(404, response.statusCode(), "Код ответа для несуществующей задачи должен быть 404");
+        URI uri = URI.create("http://localhost:8080/tasks?id=999");
+        HttpRequest getRequest = HttpRequest.newBuilder().uri(uri).GET().build();
+        HttpResponse<String> response = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, response.statusCode());
     }
 }

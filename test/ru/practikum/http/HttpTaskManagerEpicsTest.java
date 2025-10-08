@@ -2,7 +2,6 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
-import ru.practikum.http.HttpTaskServer;
 import ru.practikum.manager.InMemoryTaskManager;
 import ru.practikum.manager.TaskManager;
 import ru.practikum.model.Epic;
@@ -12,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,26 +43,35 @@ public class HttpTaskManagerEpicsTest {
     }
 
     @Test
-    public void testCreateAndGetEpic() throws IOException, InterruptedException {
-        Epic epic = new Epic("Epic 1", "Description");
+    public void testCreateGetUpdateDeleteEpic() throws IOException, InterruptedException {
+        Epic epic = new Epic("Epic 1", "Desc");
         String json = gson.toJson(epic);
 
         HttpClient client = HttpClient.newHttpClient();
         URI uri = URI.create("http://localhost:8080/epics");
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(uri)
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        assertEquals(201, response.statusCode());
+        HttpRequest postRequest = HttpRequest.newBuilder().uri(uri).POST(HttpRequest.BodyPublishers.ofString(json)).build();
+        HttpResponse<String> postResponse = client.send(postRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, postResponse.statusCode());
 
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .build();
-
+        HttpRequest getRequest = HttpRequest.newBuilder().uri(uri).GET().build();
         HttpResponse<String> getResponse = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, getResponse.statusCode());
+        Epic[] epics = gson.fromJson(getResponse.body(), Epic[].class);
+        assertEquals(1, epics.length);
+
+        epics[0].setName("Updated Epic");
+        String updateJson = gson.toJson(epics[0]);
+        HttpRequest updateRequest = HttpRequest.newBuilder().uri(uri).POST(HttpRequest.BodyPublishers.ofString(updateJson)).build();
+        HttpResponse<String> updateResponse = client.send(updateRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, updateResponse.statusCode());
+
+        HttpRequest deleteRequest = HttpRequest.newBuilder().uri(URI.create("http://localhost:8080/epics?id=" + epics[0].getId())).DELETE().build();
+        HttpResponse<String> deleteResponse = client.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, deleteResponse.statusCode());
+
+        HttpResponse<String> finalGet = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
+        Epic[] finalEpics = gson.fromJson(finalGet.body(), Epic[].class);
+        assertEquals(0, finalEpics.length);
     }
 }

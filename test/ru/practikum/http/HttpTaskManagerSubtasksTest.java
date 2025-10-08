@@ -2,7 +2,6 @@ package ru.practikum.http;
 
 import com.google.gson.Gson;
 import org.junit.jupiter.api.*;
-import ru.practikum.http.HttpTaskServer;
 import ru.practikum.manager.InMemoryTaskManager;
 import ru.practikum.manager.TaskManager;
 import ru.practikum.model.Subtask;
@@ -47,31 +46,33 @@ public class HttpTaskManagerSubtasksTest {
     }
 
     @Test
-    public void testCreateAndGetSubtask() throws IOException, InterruptedException {
-        Epic epic = new Epic("Epic 1", "Description");
+    public void testCreateGetUpdateDeleteSubtask() throws IOException, InterruptedException {
+        Epic epic = new Epic("Epic 1", "Desc");
         int epicId = manager.createEpic(epic);
 
-        Subtask subtask = new Subtask("Subtask 1", "Description", Status.NEW, epicId,
-                LocalDateTime.now(), Duration.ofMinutes(20));
-
+        Subtask subtask = new Subtask("Subtask 1", "Desc", Status.NEW, epicId, LocalDateTime.now(), Duration.ofMinutes(20));
         String json = gson.toJson(subtask);
 
         HttpClient client = HttpClient.newHttpClient();
         URI uri = URI.create("http://localhost:8080/subtasks");
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(uri)
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        assertEquals(201, response.statusCode());
+        HttpRequest postRequest = HttpRequest.newBuilder().uri(uri).POST(HttpRequest.BodyPublishers.ofString(json)).build();
+        HttpResponse<String> postResponse = client.send(postRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, postResponse.statusCode());
 
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .build();
-
+        HttpRequest getRequest = HttpRequest.newBuilder().uri(uri).GET().build();
         HttpResponse<String> getResponse = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, getResponse.statusCode());
+
+        Subtask[] subtasks = gson.fromJson(getResponse.body(), Subtask[].class);
+        subtasks[0].setName("Updated Subtask");
+        String updateJson = gson.toJson(subtasks[0]);
+        HttpRequest updateRequest = HttpRequest.newBuilder().uri(uri).POST(HttpRequest.BodyPublishers.ofString(updateJson)).build();
+        HttpResponse<String> updateResponse = client.send(updateRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, updateResponse.statusCode());
+
+        HttpRequest deleteRequest = HttpRequest.newBuilder().uri(URI.create("http://localhost:8080/subtasks?id=" + subtasks[0].getId())).DELETE().build();
+        HttpResponse<String> deleteResponse = client.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, deleteResponse.statusCode());
     }
 }
